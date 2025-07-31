@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import mysql.connector
+from tqdm import tqdm
 from config import Passwords
 
 def load_csv_folder_to_mysql(
@@ -39,8 +40,12 @@ def load_csv_folder_to_mysql(
 
         # --- 1) CREATE TABLE IF NOT EXISTS ---
         cols_defs = []
-        for col, dtype in df.dtypes.items():
-            sql_type = sql_type_map.get(str(dtype), 'TEXT')
+        for i, (col, dtype) in enumerate(df.dtypes.items()):
+            if (i == 0 and (col == 'id' or (table == 'orders' and col == 'order_id'))):
+                # Set as primary key auto_increment
+                sql_type = 'BIGINT PRIMARY KEY AUTO_INCREMENT'
+            else:
+                sql_type = sql_type_map.get(str(dtype), 'TEXT')
             cols_defs.append(f"`{col}` {sql_type}")
         create_sql = f"""
             CREATE TABLE IF NOT EXISTS `{table}` (
@@ -55,7 +60,7 @@ def load_csv_folder_to_mysql(
         insert_sql = f"INSERT INTO `{table}` ({col_names}) VALUES ({placeholders})"
 
         # --- 3) Insert row-by-row, passing the data tuple separately ---
-        for row in df.itertuples(index=False, name=None):
+        for row in tqdm(df.itertuples(index=False, name=None), desc=f"Processing table {table}"):
             cursor.execute(insert_sql, row)
 
     conn.commit()
@@ -69,5 +74,5 @@ if __name__ == '__main__':
         host="localhost",
         user="root",
         password=Passwords.mysql,
-        database="ecommerce"
+        database="store"
     )
